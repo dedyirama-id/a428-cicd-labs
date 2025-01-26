@@ -53,7 +53,7 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: 'dicoding-submission-ssh', keyFileVariable: 'identity', usernameVariable: 'userName')]) {
                         def remote = [:]
                         remote.name = 'EC2 Deployment'
-                        remote.host = '54.169.224.31'
+                        remote.host = env.DICODING_SUBMISSION_EC2_IP
                         remote.user = userName
                         remote.identityFile = identity
                         remote.allowAnyHosts = true
