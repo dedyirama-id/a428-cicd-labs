@@ -27,8 +27,21 @@ pipeline {
         }
         stage('Manual Approval') {
             steps {
-                input message: 'Lanjutkan ke tahap Deploy?',
-                    ok: 'Proceed'
+                script {
+                    sh '''
+                    docker stop temp-react-app || true
+                    docker rm temp-react-app || true
+                    docker run -d --name temp-react-app -p 3000:3000 dedyirama/react-app:latest
+                    '''
+                }
+                input message: 'Lanjutkan ke tahap Deploy? (Aplikasi sementara berjalan di port 3000 untuk pengecekan)',
+                      ok: 'Proceed'
+                script {
+                    sh '''
+                    docker stop temp-react-app || true
+                    docker rm temp-react-app || true
+                    '''
+                }
             }
         }
         stage('Deploy') {
