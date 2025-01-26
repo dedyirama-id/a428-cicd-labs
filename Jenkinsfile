@@ -59,13 +59,14 @@ pipeline {
                         remote.identityFile = identity
                         remote.allowAnyHosts = true
 
-                        // Pull the Docker image and run the container on the remote server
                         sshCommand remote: remote, command: '''
                             docker pull dedyirama/react-app:latest
                             docker stop react-app || true
                             docker rm react-app || true
                             docker run -d --name react-app --network host --memory=512m --cpu-shares=512 dedyirama/react-app:latest
                         '''
+
+                        sleep(time: 1, unit: 'MINUTES')
                     }
                 }
             }
