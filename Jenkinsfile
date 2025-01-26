@@ -1,8 +1,8 @@
 pipeline {
     agent {
         docker {
-            image 'node:16-buster-slim'
-            args '-p 3000:3000'
+            image 'docker:latest'
+            args '--privileged -v /var/run/docker.sock:/var/run/docker.sock --user root'
         }
     }
     environment {
@@ -11,12 +11,18 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                sh 'npm install'
+                script {
+                    app = docker.build('dedyirama/react-app')
+                }
             }
         }
         stage('Test') {
             steps {
-                sh './jenkins/scripts/test.sh'
+                script {
+                    app.inside {
+                        sh './jenkins/scripts/test.sh'
+                    }
+                }
             }
         }
         stage('Manual Approval') {
@@ -26,41 +32,28 @@ pipeline {
             }
         }
         stage('Deploy') {
-            environment {
-                DEPLOY_DIR = '/home/ec2-user/react-app'
-            }
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'dicoding-submission-ssh', keyFileVariable: 'identity', usernameVariable: 'userName')]) {
-                    script {
-                        def remote = [:] 
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
+                        app.push('latest')
+                    }
+                    withCredentials([sshUserPrivateKey(credentialsId: 'dicoding-submission-ssh', keyFileVariable: 'identity', usernameVariable: 'userName')]) {
+                        def remote = [:]
                         remote.name = 'EC2 Deployment'
                         remote.host = '54.169.224.31'
                         remote.user = userName
                         remote.identityFile = identity
                         remote.allowAnyHosts = true
 
-                        // Create a temporary directory and copy files excluding node_modules
-                        sh 'sudo apt-get update && sudo apt-get install -y rsync'
-                        sh 'mkdir -p temp_project && rsync -av --exclude=node_modules ./ temp_project/'
-
-                        // Create a tarball from the temporary directory
-                        sh 'tar -czf project.tar.gz -C temp_project .'
-
-                        // Upload the tarball to the target directory
-                        sshPut remote: remote, from: 'project.tar.gz', into: "${env.DEPLOY_DIR}"
-
-                        // Extract the tarball and run commands on the remote server
-                        sshCommand remote: remote, command: """
-                            cd ${env.DEPLOY_DIR}
-                            tar -xzf project.tar.gz
-                            rm project.tar.gz
-                            ./jenkins/scripts/kill.sh
-                            ./jenkins/scripts/deliver.sh
-                        """
+                        // Pull the Docker image and run the container on the remote server
+                        sshCommand remote: remote, command: '''
+                            docker pull dedyirama/react-app:latest
+                            docker stop react-app || true
+                            docker rm react-app || true
+                            docker run -d --name react-app -p 3000:3000 dedyirama/react-app:latest
+                        '''
                     }
                 }
-
-                sleep(time: 1, unit: 'MINUTES')
             }
         }
     }
