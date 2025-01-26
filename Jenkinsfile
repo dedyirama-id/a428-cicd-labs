@@ -12,6 +12,7 @@ pipeline {
         stage('Build') {
             steps {
                 script {
+                    checkout scm
                     app = docker.build('dedyirama/react-app')
                 }
             }
@@ -63,7 +64,7 @@ pipeline {
                             docker pull dedyirama/react-app:latest
                             docker stop react-app || true
                             docker rm react-app || true
-                            docker run -d --name react-app -p 3000:3000 dedyirama/react-app:latest
+                            docker run -d --name react-app --network host --memory=512m --cpu-shares=512 dedyirama/react-app:latest
                         '''
                     }
                 }
